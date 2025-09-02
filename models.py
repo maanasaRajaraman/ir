@@ -1,6 +1,16 @@
+# -*- coding: utf-8 -*-
+"""
+Consolidated Information Retrieval Models:
+- Boolean Model
+- Vector Space Model (TF-IDF + multiple similarities)
+- Binary Independence Model (BIM)
+Includes evaluation metrics: Precision, Recall, F1
+"""
+
 import string
 import math
 import numpy as np
+from collections import Counter
 
 # --- Sample Documents ---
 docs = [
@@ -33,29 +43,56 @@ def boolean_model(query):
     return relevant
 
 # --- Vector Space Model ---
-def tf(term, doc):
-    return doc.count(term)
+def tf(term, doc_tokens):
+    return doc_tokens.count(term)
 
 def idf(term):
     N = len(processed_docs)
     df = sum(1 for d in processed_docs if term in d.split())
-    return math.log((N+1) / (df+1)) + 1  # smoothed
+    return math.log((N + 1) / (df + 1)) + 1  # smoothed
 
 def tfidf_vector(text):
-    words = text.split()
-    return np.array([tf(term, words) * idf(term) for term in vocab])
+    tokens = text.split()
+    return np.array([tf(term, tokens) * idf(term) for term in vocab])
 
 doc_vectors = [tfidf_vector(doc) for doc in processed_docs]
 
-def cosine_sim(v1, v2):
-    num = np.dot(v1, v2)
-    denom = (np.linalg.norm(v1) * np.linalg.norm(v2))
-    return num / denom if denom != 0 else 0
+# --- Similarity Functions ---
+def cosine_similarity(v1, v2):
+    dot = sum(a * b for a, b in zip(v1, v2))
+    mag1 = math.sqrt(sum(a * a for a in v1))
+    mag2 = math.sqrt(sum(a * a for a in v2))
+    return dot / (mag1 * mag2) if mag1 and mag2 else 0
 
-def vector_space_model(query):
+def jaccard_coefficient(v1, v2):
+    b1 = [1 if x > 0 else 0 for x in v1]
+    b2 = [1 if x > 0 else 0 for x in v2]
+    intersection = sum(a & b for a, b in zip(b1, b2))
+    union = sum(a | b for a, b in zip(b1, b2))
+    return intersection / union if union > 0 else 0
+
+def dice_coefficient(v1, v2):
+    b1 = [1 if x > 0 else 0 for x in v1]
+    b2 = [1 if x > 0 else 0 for x in v2]
+    intersection = sum(a & b for a, b in zip(b1, b2))
+    total = sum(b1) + sum(b2)
+    return (2 * intersection) / total if total > 0 else 0
+
+# --- VSM Search ---
+def vector_space_model(query, similarity="cosine"):
     q_vec = tfidf_vector(clean_text(query))
-    scores = [(i, cosine_sim(q_vec, d_vec)) for i, d_vec in enumerate(doc_vectors)]
-    return [i for i, _ in sorted(scores, key=lambda x: x[1], reverse=True)]
+    similarities = []
+    for i, d_vec in enumerate(doc_vectors):
+        if similarity == "cosine":
+            sim = cosine_similarity(q_vec, d_vec)
+        elif similarity == "jaccard":
+            sim = jaccard_coefficient(q_vec, d_vec)
+        elif similarity == "dice":
+            sim = dice_coefficient(q_vec, d_vec)
+        else:
+            sim = cosine_similarity(q_vec, d_vec)
+        similarities.append((i, sim))
+    return [i for i, _ in sorted(similarities, key=lambda x: x[1], reverse=True)]
 
 # --- Binary Independence Model (BIM) ---
 def df(term):
@@ -116,27 +153,38 @@ def evaluate(retrieved, relevant):
     f1 = (2 * precision * recall / (precision + recall)) if (precision+recall) else 0
     return precision, recall, f1
 
- 
+# --- Main Program ---
 if __name__ == "__main__":
     query = "information retrieval query"
-
-    # Ground truth (manual relevance for testing) 
+    # Define ground truth (manual relevance)
     relevant_docs = [1, 2, 5]
 
-    print("\nBoolean Model")
+    print("\n=== Boolean Model ===")
     bm_results = boolean_model(query)
     print("Retrieved:", bm_results)
     p, r, f1 = evaluate(bm_results, relevant_docs)
     print(f"Precision={p:.2f}, Recall={r:.2f}, F1={f1:.2f}")
 
-    print("\nVector Space Model")
-    vsm_results = vector_space_model(query)
+    print("\n=== Vector Space Model (Cosine) ===")
+    vsm_results = vector_space_model(query, "cosine")
     print("Ranking:", vsm_results)
-    p, r, f1 = evaluate(vsm_results[:3], relevant_docs)  # top-3 for fair compare
+    p, r, f1 = evaluate(vsm_results[:3], relevant_docs)  # top-3
     print(f"Precision={p:.2f}, Recall={r:.2f}, F1={f1:.2f}")
 
-    print("\nBinary Independence Model")
+    print("\n=== Vector Space Model (Jaccard) ===")
+    vsm_results = vector_space_model(query, "jaccard")
+    print("Ranking:", vsm_results)
+    p, r, f1 = evaluate(vsm_results[:3], relevant_docs)
+    print(f"Precision={p:.2f}, Recall={r:.2f}, F1={f1:.2f}")
+
+    print("\n=== Vector Space Model (Dice) ===")
+    vsm_results = vector_space_model(query, "dice")
+    print("Ranking:", vsm_results)
+    p, r, f1 = evaluate(vsm_results[:3], relevant_docs)
+    print(f"Precision={p:.2f}, Recall={r:.2f}, F1={f1:.2f}")
+
+    print("\n=== Binary Independence Model ===")
     bim_results = BIM(query)
     print("Ranking:", bim_results)
-    p, r, f1 = evaluate(bim_results[:3], relevant_docs)  # top-3
+    p, r, f1 = evaluate(bim_results[:3], relevant_docs)
     print(f"Precision={p:.2f}, Recall={r:.2f}, F1={f1:.2f}")
