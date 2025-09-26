@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Sep 26 22:27:31 2025
-
-@author: maana
-"""
 
 # q1 - svd
 # q2 - page rank : binary matrix, eigenval
@@ -168,4 +163,5 @@ for i in range(0, N):
     for j in range(i+1, N):
         euc = (norm(tfidf[i]- tfidf[j]))
         print(f"Euclidean Dis of {i+1} and {j+1} = {cosSimilarity:0.4f}")
+
     
