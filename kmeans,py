@@ -1,0 +1,31 @@
+import numpy as np
+import math
+
+docs = [
+    "apple launches new iphone with advanced camera",
+    "samsung unveils latest galaxy smartphone",
+    "microsoft introduces new ai features in office",
+    "google announces ai powered search tools",
+    "apple and samsung continue smartphone rivalry"
+]
+
+
+vocab = sorted(set(" ".join(docs).split()))
+tf = np.array([[doc.split().count(w) for w in vocab] for doc in docs])
+idf = np.log(len(docs)/np.count_nonzero(tf, axis=0) )
+tfidf = tf*idf
+
+def kmeans(X, k=2, max_iter=100, seed=42):
+    np.random.seed(seed)
+    centroids = X[np.random.choice(len(X), k, replace=False)]
+    for _ in range(max_iter):
+        label = np.linalg.norm(X[:, None] - centroids, axis=2).argmin(1)
+        new_centroid = np.array([X[label==i].mean(0) for i in range(k)])
+        if np.allclose(centroids, new_centroid):
+            break
+        centroids = new_centroid
+    return label, centroids
+
+labels, centroids = kmeans(tfidf, k=2)
+for doc, label in zip(docs, labels):
+    print(f"Cluster {label}: {doc}")
